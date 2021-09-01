@@ -4,11 +4,14 @@
 # from rest_framework.decorators import api_view, permission_classes
 # from rest_framework.permissions import IsAuthenticated
 # from rest_framework.response import Response
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, viewsets, status
 from expenses.models import Expense, Category
 from expenses.serializers import ExpenseSerializer, ExpenseDetailSerializer
-# from users.models import Account
+from users.models import Account
 from .permissions import IsOwner
+from rest_framework.response import Response
+from .validators import TopUpValidator
+from .services import TopUpService
 
 
 class ExpenseListCreateAPIView(generics.ListCreateAPIView):
@@ -26,6 +29,24 @@ class ExpenseRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Expense.objects.all()
     serializer_class = ExpenseSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwner)
+
+
+class ExpenseViewSet(viewsets.ModelViewSet):
+    serializer_class = ExpenseSerializer
+    queryset = Expense.objects.all()
+    permission_classes = (permissions.IsAuthenticated, IsOwner)
+
+
+class BalanceIncreaseAPIView(generics.GenericAPIView):
+    validator_class = TopUpValidator
+    service_class = TopUpService
+
+    def post(self, request, *args, **kwargs):
+        balance = request.data.get('balance')
+        if not self.validator_class.validate_balance(request.data.get('balance')):
+           return Response('Pass balance to top-up', status=status.HTTP_400_BAD_REQUEST)
+        self.service_class.top_up(request.user, balance)
+        return Response('Ok', status=status.HTTP_200_OK)
 
 # class ExpenseCreateAPIView(generics.CreateAPIView):
 #     serializer_class = ExpenseSerializer
